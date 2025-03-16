@@ -1,12 +1,16 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState } from 'react'
 
 const BLOCK_SIZE = 16 // 单位方块的大小
 const ISO_ANGLE = Math.PI / 3 // 60度角的等轴投影
 
 const App = () => {
   const canvasRef = useRef(null);
-  const [jsonInput, setJsonInput] = useState('[{ "position": [0, 0, 0], "xyz": [4, 4, 4] }]');
+  const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 4] }]);
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    drawScene(blocks);
+  }, [blocks]);
 
   const size = BLOCK_SIZE
   const LongEdge = Math.round(Math.sin(ISO_ANGLE) * size); // 斜边1下的长边
@@ -132,42 +136,117 @@ const App = () => {
     });
   }
 
-  const handleJsonSubmit = () => {
-    try {
-      const blocks = JSON.parse(jsonInput)
-      if (!Array.isArray(blocks)) {
-        throw new Error('输入必须是数组格式')
-      }
-      
-      blocks.forEach(block => {
-        if (!block.position || !block.xyz || 
-            !Array.isArray(block.position) || !Array.isArray(block.xyz) ||
-            block.position.length !== 3 || block.xyz.length !== 3) {
-          throw new Error('每个方块必须包含position和xyz属性，且都是长度为3的数组')
-        }
-      })
+  const handleAddBlock = () => {
+    setBlocks([...blocks, { position: [0, 0, 0], xyz: [1, 1, 1] }]);
+  }
 
-      setError('')
-      drawScene(blocks)
-    } catch (err) {
-      setError(err.message)
-    }
+  const handleUpdateBlock = (index, field, subIndex, value) => {
+    const newBlocks = [...blocks];
+    newBlocks[index][field][subIndex] = parseInt(value) || 0;
+    setBlocks(newBlocks);
+    drawScene(newBlocks);
+  }
+
+  const handleDeleteBlock = (index) => {
+    const newBlocks = blocks.filter((_, i) => i !== index);
+    setBlocks(newBlocks);
+    drawScene(newBlocks);
+  }
+
+  const renderBlockInputs = (block, index) => {
+    return (
+      <div key={index} style={{
+        background: '#f7f7f7',
+        padding: '10px', 
+        marginBottom: '12px',
+        borderRadius: '4px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <h3 style={{ margin: 0 }}>方块 {index + 1}</h3>
+          <button 
+            onClick={() => handleDeleteBlock(index)}
+            style={{
+              color: '#ff4d4f',
+              border: 'none',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            删除
+          </button>
+        </div>
+        <div style={{ marginBottom: '10px' }}>
+          <div>位置 (position):</div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {['X', 'Y', 'Z'].map((axis, i) => (
+              <input
+                key={i}
+                type="number"
+                value={block.position[i]}
+                onChange={(e) => handleUpdateBlock(index, 'position', i, e.target.value)}
+                style={{ width: '60px' }}
+                placeholder={axis}
+              />
+            ))}
+          </div>
+        </div>
+        <div>
+          <div>尺寸 (xyz):</div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {['宽', '长', '高'].map((dim, i) => (
+              <input
+                key={i}
+                type="number"
+                value={block.xyz[i]}
+                onChange={(e) => handleUpdateBlock(index, 'xyz', i, e.target.value)}
+                style={{ width: '60px' }}
+                placeholder={dim}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div style={{ padding: '20px' }}>
       <h1>像素方块生成器</h1>
-      <div style={{ marginBottom: '20px' }}>
-        <textarea
-          value={jsonInput}
-          onChange={(e) => setJsonInput(e.target.value)}
-          placeholder='输入JSON格式的方块数据，例如：[{ "position": [0, 0, 0], "xyz": [4, 4, 4] }]'
-          style={{ width: '100%', height: '100px' }}
+      <div style={{ 
+        marginBottom: '20px',
+        display: 'flex',
+        gap: '20px'
+      }}>
+        <div style={{ flex: 1, maxWidth: '500px' }}>
+          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+            {blocks.map((block, index) => renderBlockInputs(block, index))}
+          </div>
+          <button 
+            onClick={handleAddBlock}
+            style={{ 
+              backgroundColor: '#1890ff',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              marginTop: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            添加方块
+          </button>
+          {error && <div style={{ color: 'red', marginTop: '10px' }}>{error}</div>}
+        </div>
+        <canvas 
+          ref={canvasRef} 
+          style={{
+            width: '500px',
+            margin: 'auto',
+            'image-rendering': 'pixelated'
+          }} 
         />
-        {error && <div style={{ color: 'red', marginTop: '10px' }}>{error}</div>}
-        <button onClick={handleJsonSubmit} style={{ marginTop: '10px' }}>生成方块</button>
       </div>
-      <canvas ref={canvasRef} style={{ border: '1px solid #ccc', width: '500px', 'image-rendering': 'pixelated' }} />
     </div>
   )
 }
