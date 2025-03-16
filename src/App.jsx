@@ -9,13 +9,15 @@ const App = () => {
   const [lastBlockId, setLastBlockId] = useState(1);
   const [error, setError] = useState('');
   const [selectedBlockIndex, setSelectedBlockIndex] = useState(null);
+  const [outlineMode, setOutlineMode] = useState('');
+  const isOuterMode = outlineMode === 'outer';
 
   // 处理方块的显示状态
   let blockStates = new Map();
 
   React.useEffect(() => {
     drawScene(blocks);
-  }, [blocks, selectedBlockIndex]);
+  }, [blocks, selectedBlockIndex, outlineMode]);
 
   const size = BLOCK_SIZE
   const LongEdge = Math.round(Math.sin(ISO_ANGLE) * size); // 斜边1下的长边
@@ -25,7 +27,7 @@ const App = () => {
   let originY = 0;
 
   // 绘制单个方块
-  const drawBlock = (ctx, _x, _y, isSelected = false) => {
+  const drawBlock = (ctx, _x, _y, isSelected = false, blockInfo) => {
     const x = Math.round(_x);
     const y = Math.round(_y);
     const p1 = [x, y];
@@ -36,41 +38,57 @@ const App = () => {
     const p6 = [x - LongEdge, y + ShortEdge];
     const p0 = [x, y + size];
 
-    // 绘制顶面
-    ctx.beginPath();
-    ctx.moveTo(p1[0], p1[1]);
-    ctx.lineTo(p2[0], p2[1]);
-    ctx.lineTo(p0[0], p0[1]);
-    ctx.lineTo(p6[0], p6[1]);
-    ctx.closePath()
-    ctx.fillStyle = isSelected ? '#a7d8ff' : '#fff'
-    ctx.fill()
-    ctx.strokeStyle = '#000'
-    ctx.stroke()
+    // 检查相邻方块的函数
+    const hasNeighbor = ([dx, dy, dz]) => {
+      const key = `${blockInfo.x + dx},${blockInfo.y + dy},${blockInfo.z + dz}`;
+      return blockStates.get(key) === true;
+    };
+    const checkOutline = (p1, p2, checkXYZ) => {
+      ctx.beginPath();
+      ctx.moveTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
 
-    // 绘制左面
-    ctx.beginPath();
-    ctx.moveTo(p6[0], p6[1]);
-    ctx.lineTo(p0[0], p0[1]);
-    ctx.lineTo(p4[0], p4[1]);
-    ctx.lineTo(p5[0], p5[1]);
-    ctx.closePath();
-    ctx.fillStyle = isSelected ? '#7ec2fb' : '#e8e8e8';
-    ctx.fill();
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#000';
+      if (isOuterMode && hasNeighbor(checkXYZ[0]) && !hasNeighbor(checkXYZ[1])) {
+        ctx.strokeStyle = '#fff';
+      }
+      if (outlineMode !== 'none') {
+        ctx.stroke();
+      }
+    };
+
+    const fillRect = (p1, p2, p3, p4, color, activeColor) => {
+      ctx.beginPath();
+      ctx.moveTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
+      ctx.lineTo(p3[0], p3[1]);
+      ctx.lineTo(p4[0], p4[1]);
+      ctx.closePath();
+      ctx.fillStyle = isSelected ? activeColor : isOuterMode ? 'white' : color;
+      ctx.fill()
+    };
+
+    // 绘制顶面
+    fillRect(p1, p2, p0, p6, '#fff', '#a7d8ff');
+    checkOutline(p1, p2, [[0, -1, 0], [0, -1, 1]]);
+    checkOutline(p2, p0, [[1, 0, 0], [0, 0, 1]]);
+    checkOutline(p0, p6, [[0, 1, 0], [0, 0, 1]]);
+    checkOutline(p6, p1, [[-1, 0, 0], [-1, 0, 1]]);
 
     // 绘制右面
-    ctx.beginPath();
-    ctx.moveTo(p0[0], p0[1]);
-    ctx.lineTo(p2[0], p2[1]);
-    ctx.lineTo(p3[0], p3[1]);
-    ctx.lineTo(p4[0], p4[1]);
-    ctx.closePath()
-    ctx.fillStyle = isSelected ? '#55aef9' : '#e0e0e0';
-    ctx.fill();
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
+    fillRect(p0, p2, p3, p4, '#aaa', '#55aef9');
+    checkOutline(p0, p2, [[0, 0, 1], [1, 0, 0]]);
+    checkOutline(p2, p3, [[0, -1, 0], [1, -1, 0]]);
+    checkOutline(p3, p4, [[0, 0, -1], [1, 0 , -1]]);
+    checkOutline(p4, p0, [[0, 1, 0], [1, 0, 0]]);
+
+    // 绘制左面
+    fillRect(p6, p0, p4, p5, '#e0e0e0', '#7ec2fb');
+    checkOutline(p6, p0, [[0, 0, 1], [0, 1, 0]]);
+    checkOutline(p0, p4, [[1, 0, 0], [0, 1, 0]]);
+    checkOutline(p4, p5, [[0, 0, -1], [0, 1, -1]]);
+    checkOutline(p5, p6, [[-1, 0, 0], [-1, 1, 0]]);
   }
 
   // 将3D坐标转换为2D等轴投影坐标
@@ -174,7 +192,7 @@ const App = () => {
     blockInfos.forEach((blockInfo) => {
       const key = `${blockInfo.x},${blockInfo.y},${blockInfo.z}`;
       if (blockInfo.type === 'delete' || blockStates.get(key) === false) return;
-      drawBlock(ctx, blockInfo.isoX, blockInfo.isoY, JSON.stringify([blockInfo.x, blockInfo.y, blockInfo.z]) === JSON.stringify(selectedBlockIndex));
+      drawBlock(ctx, blockInfo.isoX, blockInfo.isoY, JSON.stringify([blockInfo.x, blockInfo.y, blockInfo.z]) === JSON.stringify(selectedBlockIndex), blockInfo);
     });
   }
 
@@ -351,6 +369,24 @@ const App = () => {
   return (
     <div style={{ padding: '20px' }}>
       <h1>像素方块生成器</h1>
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ marginRight: '10px' }}>轮廓显示模式：</label>
+          <select 
+            value={outlineMode}
+            onChange={(e) => setOutlineMode(e.target.value)}
+            style={{
+              padding: '4px',
+              borderRadius: '4px',
+              border: '1px solid #d9d9d9'
+            }}
+          >
+            <option value="full">展示完整轮廓</option>
+            <option value="outer">只展示外轮廓</option>
+            <option value="none">完全不展示轮廓</option>
+          </select>
+        </div>
+      </div>
       <div style={{ 
         marginBottom: '20px',
         display: 'flex',
