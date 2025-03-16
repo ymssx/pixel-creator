@@ -316,12 +316,11 @@ const App = () => {
   const renderBlockInputs = (block, index) => {
     return (
       <div key={index} style={{
-        background: '#f7f7f7',
-        padding: '10px', 
-        marginBottom: '12px',
+        paddingY: '10px', 
+        marginBottom: '24px',
         borderRadius: '4px'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
           <h3 style={{ margin: 0 }}>方块 {index + 1}</h3>
           <button 
             onClick={() => handleDeleteBlock(index)}
