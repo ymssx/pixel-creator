@@ -5,11 +5,12 @@ const ISO_ANGLE = Math.PI / 3 // 60度角的等轴投影
 
 const App = () => {
   const canvasRef = useRef(null);
-  const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 4], type: '' }]);
+  const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 1], type: '' }]);
   const [lastBlockId, setLastBlockId] = useState(1);
+  const [height, setHeight] = useState(10);
   const [error, setError] = useState('');
   const [selectedBlockIndex, setSelectedBlockIndex] = useState(null);
-  const [outlineMode, setOutlineMode] = useState('');
+  const [outlineMode, setOutlineMode] = useState('none');
   const isOuterMode = outlineMode === 'outer';
 
   // 处理方块的显示状态
@@ -17,7 +18,7 @@ const App = () => {
 
   React.useEffect(() => {
     drawScene(blocks);
-  }, [blocks, selectedBlockIndex, outlineMode]);
+  }, [blocks, selectedBlockIndex, outlineMode, height]);
 
   const size = BLOCK_SIZE
   const LongEdge = Math.round(Math.sin(ISO_ANGLE) * size); // 斜边1下的长边
@@ -32,9 +33,9 @@ const App = () => {
     const y = Math.round(_y);
     const p1 = [x, y];
     const p2 = [x + LongEdge, y + ShortEdge];
-    const p3 = [x + LongEdge, y + ShortEdge + size];
-    const p4 = [x, y + 2 * size];
-    const p5 = [x - LongEdge, y + ShortEdge + size];
+    const p3 = [x + LongEdge, y + ShortEdge + height];
+    const p4 = [x, y + size + height];
+    const p5 = [x - LongEdge, y + ShortEdge + height];
     const p6 = [x - LongEdge, y + ShortEdge];
     const p0 = [x, y + size];
 
@@ -94,7 +95,7 @@ const App = () => {
   // 将3D坐标转换为2D等轴投影坐标
   const isoTo2D = (x, y, z) => {
     const isoX = (x - y) * LongEdge;
-    const isoY = (x + y) * ShortEdge - z * size;
+    const isoY = (x + y) * ShortEdge - z * height;
     return [isoX, isoY];
   }
 
@@ -255,12 +256,16 @@ const App = () => {
       if (blockStates.get(key) === false) {
         continue;
       }
-      const isInside = isPointInBlock(
-        x,
-        y,
-        blockInfo.isoX,
-        blockInfo.isoY
-      );
+
+      const bx = blockInfo.isoX;
+      const by = blockInfo.isoY;
+      const p1 = [bx, by];
+      const p2 = [bx + LongEdge, by + ShortEdge];
+      const p3 = [bx + LongEdge, by + ShortEdge + height];
+      const p4 = [bx, by + size + height];
+      const p5 = [bx - LongEdge, by + ShortEdge + height];
+      const p6 = [bx - LongEdge, by + ShortEdge];
+      const isInside = isPointInQuadrilateral([x, y], [p1, p2, p3, p4, p5, p6]);
 
       if (isInside) {
         setSelectedBlockIndex(JSON.stringify([blockInfo.x, blockInfo.y, blockInfo.z]) === JSON.stringify(selectedBlockIndex) ? null : [blockInfo.x, blockInfo.y, blockInfo.z]);
@@ -271,6 +276,26 @@ const App = () => {
     // 如果点击空白处，取消选中
     setSelectedBlockIndex(null);
   };
+
+  function isPointInQuadrilateral(point, quad) {
+    const [x, y] = point;
+    let inside = false;
+    
+    // 遍历四边形的每条边（共4条边，闭合结构）
+    for (let i = 0, j = quad.length - 1; i < quad.length; j = i, i++) {
+        const [xi, yi] = quad[i];
+        const [xj, yj] = quad[j];
+        
+        // 射线与边的交点判断条件：
+        // 1. 点的y坐标在边的y范围之间（异侧）
+        // 2. 点在该边的左侧（根据边的方向计算）
+        const intersect = ((yi > y) !== (yj > y)) && 
+            (x < ((xj - xi) * (y - yi) / (yj - yi) + xi));
+        
+        if (intersect) inside = !inside;
+    }
+    return inside;
+  }
 
   // 判断点是否在方块内
   const isPointInBlock = (px, py, blockX, blockY) => {
@@ -385,6 +410,10 @@ const App = () => {
             <option value="outer">只展示外轮廓</option>
             <option value="none">完全不展示轮廓</option>
           </select>
+        </div>
+        <div>
+          <label style={{ marginRight: '10px' }}>方块厚度：</label>
+          <input value={height} onChange={(e) => setHeight(Number(e.target.value))}></input>
         </div>
       </div>
       <div style={{ 
