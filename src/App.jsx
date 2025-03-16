@@ -10,6 +10,9 @@ const App = () => {
   const [error, setError] = useState('');
   const [selectedBlockIndex, setSelectedBlockIndex] = useState(null);
 
+  // 处理方块的显示状态
+  let blockStates = new Map();
+
   React.useEffect(() => {
     drawScene(blocks);
   }, [blocks, selectedBlockIndex]);
@@ -111,7 +114,7 @@ const App = () => {
     let maxX = -Infinity, maxY = -Infinity
 
     // 处理方块的显示状态
-    const blockStates = new Map();
+    blockStates = new Map();
     
     // 按照id排序确保操作顺序
     const sortedBlocks = [...blocks].sort((a, b) => (a.id || 0) - (b.id || 0));
@@ -197,8 +200,10 @@ const App = () => {
 
     // 生成所有方块的坐标信息
     const blockInfos = [];
-    const blockStates = new Map();
     blocks.forEach((block) => {
+      if (block.type === 'delete') {
+        return;
+      }
       const [px, py, pz] = block.position;
       const [sx, sy, sz] = block.xyz;
 
@@ -206,22 +211,13 @@ const App = () => {
         for (let by = 0; by < sy; by++) {
           for (let bz = 0; bz < sz; bz++) {
             const [isoX, isoY] = isoTo2D(px + bx, py + by, pz + bz);
-            const key = `${px + bx},${py + by},${pz + bz}`;
-            if (block.type === 'delete') {
-              blockStates.set(key, false);
-            } else if (!blockStates.has(key)) {
-              blockStates.set(key, true);
-            }
-            
-            if (blockStates.get(key)) {
-              blockInfos.push({
-                isoX,
-                isoY,
-                x: px + bx,
-                y: py + by,
-                z: pz + bz
-              });
-            }
+            blockInfos.push({
+              isoX,
+              isoY,
+              x: px + bx,
+              y: py + by,
+              z: pz + bz
+            });
           }
         }
       }
@@ -237,6 +233,10 @@ const App = () => {
     // 从前向后检查点击是否在方块内
     for (let i = blockInfos.length - 1; i >= 0; i--) {
       const blockInfo = blockInfos[i];
+      const key = `${blockInfo.x},${blockInfo.y},${blockInfo.z}`;
+      if (blockStates.get(key) === false) {
+        continue;
+      }
       const isInside = isPointInBlock(
         x,
         y,
