@@ -3,9 +3,24 @@ import React, { useRef, useState } from 'react'
 const BLOCK_SIZE = 16 // 单位方块的大小
 const ISO_ANGLE = Math.PI / 3 // 60度角的等轴投影
 
+// 颜色加深/变浅的辅助函数
+const shadeColor = (color, percent) => {
+  const num = parseInt(color.replace("#",""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) + amt;
+  const G = (num >> 8 & 0x00FF) + amt;
+  const B = (num & 0x0000FF) + amt;
+  return "#" + (
+    0x1000000 +
+    (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+    (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+    (B < 255 ? (B < 1 ? 0 : B) : 255)
+  ).toString(16).slice(1);
+};
+
 const App = () => {
   const canvasRef = useRef(null);
-  const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 1], type: '' }]);
+  const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 1], type: '', colors: { top: '#ffffff', left: '#aaaaaa', right: '#e0e0e0' } }]);
   const [lastBlockId, setLastBlockId] = useState(1);
   const [height, setHeight] = useState(10);
   const [error, setError] = useState('');
@@ -71,21 +86,21 @@ const App = () => {
     };
 
     // 绘制顶面
-    fillRect(p1, p2, p0, p6, '#fff', '#a7d8ff');
+    fillRect(p1, p2, p0, p6, blockInfo.colors?.top || '#fff', '#a7d8ff');
     checkOutline(p1, p2, [[0, -1, 0], [0, -1, 1]]);
     checkOutline(p2, p0, [[1, 0, 0], [0, 0, 1]]);
     checkOutline(p0, p6, [[0, 1, 0], [0, 0, 1]]);
     checkOutline(p6, p1, [[-1, 0, 0], [-1, 0, 1]]);
 
     // 绘制右面
-    fillRect(p0, p2, p3, p4, '#aaa', '#55aef9');
+    fillRect(p0, p2, p3, p4, blockInfo.colors?.right || '#e0e0e0', '#7ec2fb');
     checkOutline(p0, p2, [[0, 0, 1], [1, 0, 0]]);
     checkOutline(p2, p3, [[0, -1, 0], [1, -1, 0]]);
     checkOutline(p3, p4, [[0, 0, -1], [1, 0 , -1]]);
     checkOutline(p4, p0, [[0, 1, 0], [1, 0, 0]]);
 
     // 绘制左面
-    fillRect(p6, p0, p4, p5, '#e0e0e0', '#7ec2fb');
+    fillRect(p6, p0, p4, p5, blockInfo.colors?.left || '#aaaaaa', '#55aef9');
     checkOutline(p6, p0, [[0, 0, 1], [0, 1, 0]]);
     checkOutline(p0, p4, [[1, 0, 0], [0, 1, 0]]);
     checkOutline(p4, p5, [[0, 0, -1], [0, 1, -1]]);
@@ -164,6 +179,7 @@ const App = () => {
               isoX,
               isoY,
               type: block.type,
+              colors: block.colors,
             });
           }
         }
@@ -198,7 +214,7 @@ const App = () => {
   }
 
   const handleAddBlock = () => {
-    setBlocks([...blocks, { position: [0, 0, 0], xyz: [1, 1, 1], type: '', id: lastBlockId }]);
+    setBlocks([...blocks, { position: [0, 0, 0], xyz: [1, 1, 1], type: '', colors: { top: '#ffffff', left: '#aaaaaa', right: '#e0e0e0' }, id: lastBlockId }]);
     setLastBlockId(lastBlockId + 1);
   }
 
@@ -386,6 +402,56 @@ const App = () => {
             ))}
           </div>
         </div>
+        {block.type !== 'delete' && (<div>
+          <div>颜色设置:</div>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+            <div>
+              <div>顶面</div>
+              <input
+                type="color"
+                value={block.colors?.top || '#ffffff'}
+                onChange={(e) => {
+                  const newBlocks = [...blocks];
+                  const topColor = e.target.value;
+                  // 计算右面和左面的颜色（逐渐加深）
+                  const leftColor = shadeColor(topColor, -35);  // 比顶面深35%
+                  const rightColor = shadeColor(topColor, -20); // 比顶面深20%
+                  newBlocks[index].colors = { 
+                    ...newBlocks[index].colors, 
+                    top: topColor,
+                    right: rightColor,
+                    left: leftColor
+                  };
+                  setBlocks(newBlocks);
+                }}
+              />
+            </div>
+            <div>
+              <div>右面</div>
+              <input
+                type="color"
+                value={block.colors?.right || '#e0e0e0'}
+                onChange={(e) => {
+                  const newBlocks = [...blocks];
+                  newBlocks[index].colors = { ...newBlocks[index].colors, right: e.target.value };
+                  setBlocks(newBlocks);
+                }}
+              />
+            </div>
+            <div>
+              <div>左面</div>
+              <input
+                type="color"
+                value={block.colors?.left || '#aaaaaa'}
+                onChange={(e) => {
+                  const newBlocks = [...blocks];
+                  newBlocks[index].colors = { ...newBlocks[index].colors, left: e.target.value };
+                  setBlocks(newBlocks);
+                }}
+              />
+            </div>
+          </div>
+        </div>)}
       </div>
     );
   }
