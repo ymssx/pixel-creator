@@ -7,17 +7,21 @@ const App = () => {
   const canvasRef = useRef(null);
   const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 4] }]);
   const [error, setError] = useState('');
+  const [selectedBlockIndex, setSelectedBlockIndex] = useState(null);
 
   React.useEffect(() => {
     drawScene(blocks);
-  }, [blocks]);
+  }, [blocks, selectedBlockIndex]);
 
   const size = BLOCK_SIZE
   const LongEdge = Math.round(Math.sin(ISO_ANGLE) * size); // 斜边1下的长边
   const ShortEdge = Math.round(Math.cos(ISO_ANGLE) * size); // 斜边1下的短边
 
+  let originX = 0;
+  let originY = 0;
+
   // 绘制单个方块
-  const drawBlock = (ctx, _x, _y) => {
+  const drawBlock = (ctx, _x, _y, isSelected = false) => {
     const x = Math.round(_x);
     const y = Math.round(_y);
     const p1 = [x, y];
@@ -35,7 +39,7 @@ const App = () => {
     ctx.lineTo(p0[0], p0[1]);
     ctx.lineTo(p6[0], p6[1]);
     ctx.closePath()
-    ctx.fillStyle = '#fff'
+    ctx.fillStyle = isSelected ? '#a7d8ff' : '#fff'
     ctx.fill()
     ctx.strokeStyle = '#000'
     ctx.stroke()
@@ -47,7 +51,7 @@ const App = () => {
     ctx.lineTo(p4[0], p4[1]);
     ctx.lineTo(p5[0], p5[1]);
     ctx.closePath();
-    ctx.fillStyle = '#e8e8e8';
+    ctx.fillStyle = isSelected ? '#7ec2fb' : '#e8e8e8';
     ctx.fill();
     ctx.strokeStyle = '#000';
     ctx.stroke();
@@ -59,7 +63,7 @@ const App = () => {
     ctx.lineTo(p3[0], p3[1]);
     ctx.lineTo(p4[0], p4[1]);
     ctx.closePath()
-    ctx.fillStyle = '#e0e0e0';
+    ctx.fillStyle = isSelected ? '#55aef9' : '#e0e0e0';
     ctx.fill();
     ctx.strokeStyle = '#000';
     ctx.stroke();
@@ -129,10 +133,12 @@ const App = () => {
 
     // 移动坐标系原点，使所有内容可见
     ctx.translate(-minX, -minY);
+    originX = -minX;
+    originY = -minY;
 
     // 按顺序绘制可见的方块
     blockInfos.forEach((blockInfo) => {
-      drawBlock(ctx, blockInfo.isoX, blockInfo.isoY);
+      drawBlock(ctx, blockInfo.isoX, blockInfo.isoY, JSON.stringify([blockInfo.x, blockInfo.y, blockInfo.z]) === JSON.stringify(selectedBlockIndex));
     });
   }
 
@@ -147,10 +153,77 @@ const App = () => {
     drawScene(newBlocks);
   }
 
+  const handleCanvasClick = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX - originX;
+    const y = (e.clientY - rect.top) * scaleY - originY;
+
+    // 生成所有方块的坐标信息
+    const blockInfos = [];
+    blocks.forEach((block) => {
+      const [px, py, pz] = block.position;
+      const [sx, sy, sz] = block.xyz;
+
+      for (let bx = 0; bx < sx; bx++) {
+        for (let by = 0; by < sy; by++) {
+          for (let bz = 0; bz < sz; bz++) {
+            const [isoX, isoY] = isoTo2D(px + bx, py + by, pz + bz);
+            blockInfos.push({
+              isoX,
+              isoY,
+              x: px + bx,
+              y: py + by,
+              z: pz + bz
+            });
+          }
+        }
+      }
+    });
+
+    // 按照从外向内的顺序排序（坐标从大到小）
+    blockInfos.sort((a, b) => {
+      if (a.x !== b.x) return a.x - b.x;
+      if (a.y !== b.y) return a.y - b.y;
+      return a.z - b.z;
+    });
+
+    // 从前向后检查点击是否在方块内
+    for (let i = blockInfos.length - 1; i >= 0; i--) {
+      const blockInfo = blockInfos[i];
+      const isInside = isPointInBlock(
+        x,
+        y,
+        blockInfo.isoX,
+        blockInfo.isoY
+      );
+
+      if (isInside) {
+        setSelectedBlockIndex(JSON.stringify([blockInfo.x, blockInfo.y, blockInfo.z]) === JSON.stringify(selectedBlockIndex) ? null : [blockInfo.x, blockInfo.y, blockInfo.z]);
+        return;
+      }
+    }
+
+    // 如果点击空白处，取消选中
+    setSelectedBlockIndex(null);
+  };
+
+  // 判断点是否在方块内
+  const isPointInBlock = (px, py, blockX, blockY) => {
+    // 定义方块的六个顶点
+    const p0 = [blockX, blockY + size];
+    // 通过内切圆法近似判断是否在方块内
+    return (
+      Math.pow(px - p0[0], 2) + Math.pow(py - p0[1], 2) <= LongEdge ** 2
+    );
+  };
+
   const handleDeleteBlock = (index) => {
     const newBlocks = blocks.filter((_, i) => i !== index);
     setBlocks(newBlocks);
-    drawScene(newBlocks);
+    setSelectedBlockIndex(null);
   }
 
   const renderBlockInputs = (block, index) => {
@@ -240,10 +313,12 @@ const App = () => {
         </div>
         <canvas 
           ref={canvasRef} 
+          onClick={handleCanvasClick}
           style={{
             width: '500px',
             margin: 'auto',
-            'image-rendering': 'pixelated'
+            'image-rendering': 'pixelated',
+            cursor: 'pointer'
           }} 
         />
       </div>
