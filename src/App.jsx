@@ -23,9 +23,10 @@ const App = () => {
   const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 1], type: '', colors: { top: '#ffffff', left: '#aaaaaa', right: '#e0e0e0' } }]);
   const [lastBlockId, setLastBlockId] = useState(1);
   const [height, setHeight] = useState(10);
+  const [size, setSize] = useState(BLOCK_SIZE);
   const [error, setError] = useState('');
   const [selectedBlockIndex, setSelectedBlockIndex] = useState(null);
-  const [outlineMode, setOutlineMode] = useState('none');
+  const [outlineMode, setOutlineMode] = useState('full');
   const isOuterMode = outlineMode === 'outer';
 
   // 处理方块的显示状态
@@ -33,9 +34,8 @@ const App = () => {
 
   React.useEffect(() => {
     drawScene(blocks);
-  }, [blocks, selectedBlockIndex, outlineMode, height]);
+  }, [blocks, selectedBlockIndex, outlineMode, height, size]);
 
-  const size = BLOCK_SIZE
   const LongEdge = Math.round(Math.sin(ISO_ANGLE) * size); // 斜边1下的长边
   const ShortEdge = Math.round(Math.cos(ISO_ANGLE) * size); // 斜边1下的短边
 
@@ -65,7 +65,7 @@ const App = () => {
       ctx.lineTo(p2[0], p2[1]);
 
       ctx.lineWidth = 1;
-      ctx.strokeStyle = '#000';
+      ctx.strokeStyle = blockInfo.colors?.line || '#000';
       if (isOuterMode && hasNeighbor(checkXYZ[0]) && !hasNeighbor(checkXYZ[1])) {
         ctx.strokeStyle = '#fff';
       }
@@ -416,11 +416,13 @@ const App = () => {
                   // 计算右面和左面的颜色（逐渐加深）
                   const leftColor = shadeColor(topColor, -35);  // 比顶面深35%
                   const rightColor = shadeColor(topColor, -20); // 比顶面深20%
+                  const lineColor = shadeColor(topColor, -50); // 比顶面深60%
                   newBlocks[index].colors = { 
                     ...newBlocks[index].colors, 
                     top: topColor,
                     right: rightColor,
-                    left: leftColor
+                    left: leftColor,
+                    line: lineColor,
                   };
                   setBlocks(newBlocks);
                 }}
@@ -450,6 +452,18 @@ const App = () => {
                 }}
               />
             </div>
+            {outlineMode !== 'none' && (<div>
+              <div>描边</div>
+              <input
+                type="color"
+                value={block.colors?.line || '#fff'}
+                onChange={(e) => {
+                  const newBlocks = [...blocks];
+                  newBlocks[index].colors = { ...newBlocks[index].colors, line: e.target.value };
+                  setBlocks(newBlocks);
+                }}
+              />
+            </div>)}
           </div>
         </div>)}
       </div>
@@ -479,6 +493,10 @@ const App = () => {
         <div>
           <label style={{ marginRight: '10px' }}>方块厚度：</label>
           <input value={height} onChange={(e) => setHeight(Number(e.target.value))}></input>
+        </div>
+        <div>
+          <label style={{ marginRight: '10px' }}>斜边长度：</label>
+          <input value={size} onChange={(e) => setSize(Number(e.target.value))}></input>
         </div>
       </div>
       <div style={{ 
