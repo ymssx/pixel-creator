@@ -11,7 +11,6 @@ const App = () => {
   const size = BLOCK_SIZE
   const LongEdge = Math.round(Math.sin(ISO_ANGLE) * size); // 斜边1下的长边
   const ShortEdge = Math.round(Math.cos(ISO_ANGLE) * size); // 斜边1下的短边
-  console.log('长边', LongEdge, '短边', ShortEdge)
 
   // 绘制单个方块
   const drawBlock = (ctx, _x, _y) => {
@@ -82,7 +81,8 @@ const App = () => {
     let minX = Infinity, minY = Infinity
     let maxX = -Infinity, maxY = -Infinity
 
-    // 计算所有方块的2D坐标范围
+    // 生成所有方块的坐标信息
+    const blockInfos = [];
     blocks.forEach(block => {
       const [px, py, pz] = block.position
       const [sx, sy, sz] = block.xyz
@@ -96,10 +96,25 @@ const App = () => {
             minY = Math.min(minY, isoY);
             maxX = Math.max(maxX, isoX + LongEdge + 1);
             maxY = Math.max(maxY, isoY + 2 * ShortEdge + size + 1);
+            
+            blockInfos.push({
+              x: px + x,
+              y: py + y,
+              z: pz + z,
+              isoX,
+              isoY
+            });
           }
         }
       }
     })
+
+    // 按照x、y、z坐标从小到大排序
+    blockInfos.sort((a, b) => {
+      if (a.x !== b.x) return a.x - b.x;
+      if (a.y !== b.y) return a.y - b.y;
+      return a.z - b.z;
+    });
 
     // 设置画布大小
     canvas.width = maxX - minX
@@ -111,21 +126,10 @@ const App = () => {
     // 移动坐标系原点，使所有内容可见
     ctx.translate(-minX, -minY);
 
-    // 按照z轴顺序绘制方块
-    blocks.forEach(block => {
-      const [px, py, pz] = block.position
-      const [sx, sy, sz] = block.xyz
-
-      for (let x = 0; x < sx; x++) {
-        for (let y = 0; y < sy; y++) {
-          for (let z = 0; z < sz; z++) {
-            const [isoX, isoY] = isoTo2D(px + x, py + y, pz + z)
-            console.log('绘制方块', [px + x, py + y, pz + z], [isoX, isoY])
-            drawBlock(ctx, isoX, isoY)
-          }
-        }
-      }
-    })
+    // 按顺序绘制可见的方块
+    blockInfos.forEach((blockInfo) => {
+      drawBlock(ctx, blockInfo.isoX, blockInfo.isoY);
+    });
   }
 
   const handleJsonSubmit = () => {
