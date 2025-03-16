@@ -5,7 +5,8 @@ const ISO_ANGLE = Math.PI / 3 // 60度角的等轴投影
 
 const App = () => {
   const canvasRef = useRef(null);
-  const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 4] }]);
+  const [blocks, setBlocks] = useState([{ position: [0, 0, 0], xyz: [4, 4, 4], type: '' }]);
+  const [lastBlockId, setLastBlockId] = useState(1);
   const [error, setError] = useState('');
   const [selectedBlockIndex, setSelectedBlockIndex] = useState(null);
 
@@ -76,6 +77,26 @@ const App = () => {
     return [isoX, isoY];
   }
 
+  // 处理键盘事件
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' && selectedBlockIndex) {
+        const [x, y, z] = selectedBlockIndex;
+        setBlocks([...blocks, { 
+          position: [x, y, z], 
+          xyz: [1, 1, 1], 
+          type: 'delete',
+          id: lastBlockId
+        }]);
+        setLastBlockId(lastBlockId + 1);
+        setSelectedBlockIndex(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedBlockIndex, blocks, lastBlockId]);
+
   // 绘制整个场景
   const drawScene = (blocks) => {
     const canvas = canvasRef.current
@@ -89,28 +110,38 @@ const App = () => {
     let minX = Infinity, minY = Infinity
     let maxX = -Infinity, maxY = -Infinity
 
+    // 处理方块的显示状态
+    const blockStates = new Map();
+    
+    // 按照id排序确保操作顺序
+    const sortedBlocks = [...blocks].sort((a, b) => (a.id || 0) - (b.id || 0));
+    
     // 生成所有方块的坐标信息
     const blockInfos = [];
-    blocks.forEach(block => {
+    sortedBlocks.forEach(block => {
       const [px, py, pz] = block.position
       const [sx, sy, sz] = block.xyz
 
       for (let x = 0; x < sx; x++) {
         for (let y = 0; y < sy; y++) {
           for (let z = 0; z < sz; z++) {
-            const [isoX, isoY] = isoTo2D(px + x, py + y, pz + z)
+            const key = `${px + x},${py + y},${pz + z}`;
+            blockStates.set(key, block.type !== 'delete');
+
+            const [isoX, isoY] = isoTo2D(px + x, py + y, pz + z);
             // 考虑方块的所有可见部分，增加边距
             minX = Math.min(minX, isoX - LongEdge);
             minY = Math.min(minY, isoY);
             maxX = Math.max(maxX, isoX + LongEdge + 1);
             maxY = Math.max(maxY, isoY + 2 * ShortEdge + size + 1);
-            
+
             blockInfos.push({
               x: px + x,
               y: py + y,
               z: pz + z,
               isoX,
-              isoY
+              isoY,
+              type: block.type,
             });
           }
         }
@@ -138,12 +169,15 @@ const App = () => {
 
     // 按顺序绘制可见的方块
     blockInfos.forEach((blockInfo) => {
+      const key = `${blockInfo.x},${blockInfo.y},${blockInfo.z}`;
+      if (blockInfo.type === 'delete' || blockStates.get(key) === false) return;
       drawBlock(ctx, blockInfo.isoX, blockInfo.isoY, JSON.stringify([blockInfo.x, blockInfo.y, blockInfo.z]) === JSON.stringify(selectedBlockIndex));
     });
   }
 
   const handleAddBlock = () => {
-    setBlocks([...blocks, { position: [0, 0, 0], xyz: [1, 1, 1] }]);
+    setBlocks([...blocks, { position: [0, 0, 0], xyz: [1, 1, 1], type: '', id: lastBlockId }]);
+    setLastBlockId(lastBlockId + 1);
   }
 
   const handleUpdateBlock = (index, field, subIndex, value) => {
@@ -163,6 +197,7 @@ const App = () => {
 
     // 生成所有方块的坐标信息
     const blockInfos = [];
+    const blockStates = new Map();
     blocks.forEach((block) => {
       const [px, py, pz] = block.position;
       const [sx, sy, sz] = block.xyz;
@@ -171,13 +206,22 @@ const App = () => {
         for (let by = 0; by < sy; by++) {
           for (let bz = 0; bz < sz; bz++) {
             const [isoX, isoY] = isoTo2D(px + bx, py + by, pz + bz);
-            blockInfos.push({
-              isoX,
-              isoY,
-              x: px + bx,
-              y: py + by,
-              z: pz + bz
-            });
+            const key = `${px + bx},${py + by},${pz + bz}`;
+            if (block.type === 'delete') {
+              blockStates.set(key, false);
+            } else if (!blockStates.has(key)) {
+              blockStates.set(key, true);
+            }
+            
+            if (blockStates.get(key)) {
+              blockInfos.push({
+                isoX,
+                isoY,
+                x: px + bx,
+                y: py + by,
+                z: pz + bz
+              });
+            }
           }
         }
       }
@@ -248,6 +292,27 @@ const App = () => {
           >
             删除
           </button>
+        </div>
+        <div style={{ marginBottom: '10px', display: 'flex', gap: '10px' }}>
+          <div>类型 (type):</div>
+          <div style={{ }}>
+            <select
+              value={block.type}
+              onChange={(e) => {
+                const newBlocks = [...blocks];
+                newBlocks[index].type = e.target.value;
+                setBlocks(newBlocks);
+              }}
+              style={{
+                padding: '4px',
+                borderRadius: '4px',
+                border: '1px solid #d9d9d9'
+              }}
+            >
+              <option value="">新建</option>
+              <option value="delete">删除</option>
+            </select>
+          </div>
         </div>
         <div style={{ marginBottom: '10px' }}>
           <div>位置 (position):</div>
