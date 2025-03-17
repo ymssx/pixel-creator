@@ -61,8 +61,8 @@ const App = () => {
     };
     const checkOutline = (p1, p2, checkXYZ) => {
       ctx.beginPath();
-      ctx.moveTo(p1[0], p1[1]);
-      ctx.lineTo(p2[0], p2[1]);
+      ctx.moveTo(p1[0] + 0.5, p1[1] + 0.5);
+      ctx.lineTo(p2[0] + 0.5, p2[1] + 0.5);
 
       ctx.lineWidth = 1;
       ctx.strokeStyle = blockInfo.colors?.line || '#000';
